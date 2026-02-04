@@ -1,11 +1,11 @@
 import sqlite3
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path("/workspace/bot-empresa/data/bot_empresa.db")
+from app.config import DB_PATH
 
 
 def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
-    path = Path(db_path) if db_path else DEFAULT_DB_PATH
+    path = Path(db_path) if db_path else Path(DB_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
