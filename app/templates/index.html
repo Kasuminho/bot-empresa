@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conciliação Bancária</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      color: #1f2933;
+    }
+    h1 {
+      margin-bottom: 0.5rem;
+    }
+    .section {
+      margin-top: 2rem;
+      padding: 1rem;
+      border: 1px solid #d9e2ec;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0.5rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef2f7;
+    }
+    .badge {
+      padding: 0.2rem 0.5rem;
+      background: #d1fae5;
+      color: #065f46;
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+    .muted {
+      color: #52606d;
+      font-size: 0.9rem;
+    }
+    .stats {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      margin-top: 1.5rem;
+    }
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid #d9e2ec;
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+    .stat-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.95rem;
+      color: #52606d;
+    }
+    .stat-card strong {
+      display: block;
+      font-size: 1.3rem;
+      color: #102a43;
+    }
+  </style>
+</head>
+<body>
+  <h1>Conciliação Bancária</h1>
+  <p class="muted">Selecione um crédito do banco e associe aos loads pagos.</p>
+
+  <section class="stats">
+    <div class="stat-card">
+      <h3>Total de créditos</h3>
+      <strong>{{ '%.2f'|format(stats.total_credit or 0) }}</strong>
+      <span class="muted">Entradas registradas</span>
+    </div>
+    <div class="stat-card">
+      <h3>Total de débitos</h3>
+      <strong>{{ '%.2f'|format(stats.total_debit or 0) }}</strong>
+      <span class="muted">Saídas registradas</span>
+    </div>
+    <div class="stat-card">
+      <h3>Transações conciliadas</h3>
+      <strong>{{ reconciled_count[0] if reconciled_count else 0 }}</strong>
+      <span class="muted">Pagamentos + outras conciliações</span>
+    </div>
+    <div class="stat-card">
+      <h3>Loads pendentes</h3>
+      <strong>{{ pending_loads[0] if pending_loads else 0 }}</strong>
+      <span class="muted">Aguardando pagamento</span>
+    </div>
+  </section>
+
+  <form class="section" method="post" action="/reconcile">
+    <h2>1) Escolha o crédito bancário</h2>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Data</th>
+          <th>Descrição</th>
+          <th>Valor</th>
+          <th>Conta</th>
+          <th>Tipo</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for txn in bank_transactions %}
+        <tr>
+          <td><input type="radio" name="bank_transaction_id" value="{{ txn.id }}" required></td>
+          <td>{{ txn.txn_date }}</td>
+          <td>{{ txn.description }}</td>
+          <td>{{ '%.2f'|format(txn.amount) }}</td>
+          <td>{{ txn.account_label or '-' }}</td>
+          <td>{{ txn.transaction_type or '-' }}</td>
+          <td>
+            {% if txn.payment_id %}
+              <span class="badge">Conciliado (loads)</span>
+            {% elif txn.reconciliation_type %}
+              <span class="badge">Conciliado ({{ txn.reconciliation_type }})</span>
+            {% else %}
+              Pendente
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>1.5) Tipo de conciliação</h2>
+    <label>
+      <select name="reconciliation_type" required>
+        <option value="loads">Pago via loads</option>
+        <option value="transfer">Transferência/Zelle</option>
+        <option value="other">Outro crédito</option>
+      </select>
+    </label>
+    <label>
+      Observações:
+      <input type="text" name="notes" placeholder="Ex: transferência interna ou ajuste" />
+    </label>
+
+    <h2>2) Marque os loads pagos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Load</th>
+          <th>Motorista</th>
+          <th>Placa</th>
+          <th>Data</th>
+          <th>Valor Bruto</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for load in loads %}
+        <tr>
+          <td><input type="checkbox" name="load_ids" value="{{ load.id }}"></td>
+          <td>{{ load.external_id }}</td>
+          <td>{{ load.driver_name or '-' }}</td>
+          <td>{{ load.truck_plate or '-' }}</td>
+          <td>{{ load.load_date or '-' }}</td>
+          <td>{{ '%.2f'|format(load.amount_gross) }}</td>
+          <td>{{ load.status }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <button type="submit">Conciliar pagamento</button>
+  </form>
+</body>
+</html>
