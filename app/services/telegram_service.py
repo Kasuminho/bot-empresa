@@ -1,5 +1,6 @@
 import shlex
 import tempfile
+from pathlib import Path
 from uuid import uuid4
 from typing import Any
 
@@ -405,34 +406,40 @@ class TelegramService:
                     self.send_bot_message(chat_id, "Dry-run OK: CSV válido para importação.")
                     self._audit(chat_id, username, command, payload, "ok")
                     return
-                with tempfile.NamedTemporaryFile(suffix=".csv") as tmp_file:
-                    tmp_file.write(file_bytes)
-                    tmp_file.flush()
+                tmp_file_path = ""
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp_file:
+                        tmp_file.write(file_bytes)
+                        tmp_file_path = tmp_file.name
+
                     if command == "/import_owners":
-                        count = import_owners(tmp_file.name)
+                        count = import_owners(tmp_file_path)
                     elif command == "/import_drivers":
-                        count = import_drivers(tmp_file.name)
+                        count = import_drivers(tmp_file_path)
                     elif command == "/import_trucks":
-                        count = import_trucks(tmp_file.name)
+                        count = import_trucks(tmp_file_path)
                     elif command == "/import_accounts":
-                        count = import_bank_accounts(tmp_file.name)
+                        count = import_bank_accounts(tmp_file_path)
                     elif command == "/import_loads":
-                        count = import_loads(tmp_file.name, sheet_owner=args.get("sheet_owner"))
+                        count = import_loads(tmp_file_path, sheet_owner=args.get("sheet_owner"))
                     elif command == "/import_bank":
-                        count = import_bank_transactions(tmp_file.name, sheet_owner=args.get("sheet_owner"))
+                        count = import_bank_transactions(tmp_file_path, sheet_owner=args.get("sheet_owner"))
                     elif command == "/import_expenses":
-                        count = import_expenses(tmp_file.name)
+                        count = import_expenses(tmp_file_path)
                     elif command == "/import_car_loads":
                         truck_id = args.get("truck_id")
                         if not truck_id:
                             raise ValueError("Informe truck_id para importação de carros.")
                         count = import_car_loads(
-                            tmp_file.name,
+                            tmp_file_path,
                             truck_external_id=truck_id,
                             sheet_owner=args.get("sheet_owner"),
                         )
                     else:
                         raise ValueError("Importação não reconhecida.")
+                finally:
+                    if tmp_file_path:
+                        Path(tmp_file_path).unlink(missing_ok=True)
                 self.send_bot_message(chat_id, f"Importação concluída ({count} registros).")
                 self._audit(chat_id, username, command, payload, "ok")
                 return
