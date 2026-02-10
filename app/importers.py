@@ -5,7 +5,7 @@ from pathlib import Path
 from app.db import get_connection
 from app.finance import ensure_dispatcher_fee_expense
 
-DATE_FORMATS = ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]
+DATE_FORMATS = ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"]
 
 
 def parse_date(value: str | None) -> str | None:
