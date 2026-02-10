@@ -12,11 +12,10 @@ from app.importers import (
     import_owners,
     import_trucks,
 )
-from app.telegram import send_message
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Bot Empresa CLI")
+    parser = argparse.ArgumentParser(description="Bot Empresa (importações)")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("init-db")
@@ -48,11 +47,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     import_expense = subparsers.add_parser("import-expenses")
     import_expense.add_argument("path", type=Path)
-
-    telegram_cmd = subparsers.add_parser("send-telegram")
-    telegram_cmd.add_argument("--token", required=True)
-    telegram_cmd.add_argument("--chat-id", required=True)
-    telegram_cmd.add_argument("--text", required=True)
 
     return parser
 
@@ -92,9 +86,6 @@ def main() -> None:
     elif args.command == "import-expenses":
         count = import_expenses(args.path)
         print(f"{count} despesas importadas.")
-    elif args.command == "send-telegram":
-        send_message(args.token, args.chat_id, args.text)
-        print("Mensagem enviada.")
 
 
 if __name__ == "__main__":

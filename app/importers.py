@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.db import get_connection
+from app.finance import ensure_dispatcher_fee_expense
 
 DATE_FORMATS = ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]
 
@@ -51,7 +52,7 @@ def import_owners(path: Path | str) -> int:
         cursor.execute(
             """
             INSERT INTO owners (external_id, name, telegram_chat_id)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
             ON CONFLICT(external_id) DO UPDATE SET
                 name=excluded.name,
                 telegram_chat_id=excluded.telegram_chat_id
@@ -72,7 +73,7 @@ def import_drivers(path: Path | str) -> int:
         cursor.execute(
             """
             INSERT INTO drivers (external_id, name, owner_id, is_owner_driver)
-            VALUES (?, ?, (SELECT id FROM owners WHERE external_id = ?), ?)
+            VALUES (%s, %s, (SELECT id FROM owners WHERE external_id = %s), %s)
             ON CONFLICT(external_id) DO UPDATE SET
                 name=excluded.name,
                 owner_id=excluded.owner_id,
@@ -98,7 +99,7 @@ def import_trucks(path: Path | str) -> int:
         cursor.execute(
             """
             INSERT INTO trucks (external_id, owner_id, plate)
-            VALUES (?, (SELECT id FROM owners WHERE external_id = ?), ?)
+            VALUES (%s, (SELECT id FROM owners WHERE external_id = %s), %s)
             ON CONFLICT(external_id) DO UPDATE SET
                 owner_id=excluded.owner_id,
                 plate=excluded.plate
@@ -119,10 +120,10 @@ def import_bank_accounts(path: Path | str) -> int:
             """
             INSERT INTO bank_accounts (external_id, owner_id, driver_id, label)
             VALUES (
-                ?,
-                (SELECT id FROM owners WHERE external_id = ?),
-                (SELECT id FROM drivers WHERE external_id = ?),
-                ?
+                %s,
+                (SELECT id FROM owners WHERE external_id = %s),
+                (SELECT id FROM drivers WHERE external_id = %s),
+                %s
             )
             ON CONFLICT(external_id) DO UPDATE SET
                 owner_id=excluded.owner_id,
@@ -163,17 +164,17 @@ def import_loads(path: Path | str, sheet_owner: str | None = None) -> int:
                 updated_at
             )
             VALUES (
-                ?,
-                (SELECT id FROM drivers WHERE external_id = ?),
-                (SELECT id FROM trucks WHERE external_id = ?),
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                COALESCE(?, 'open'),
-                ?,
-                ?,
+                %s,
+                (SELECT id FROM drivers WHERE external_id = %s),
+                (SELECT id FROM trucks WHERE external_id = %s),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                COALESCE(%s, 'open'),
+                %s,
+                %s,
                 CURRENT_TIMESTAMP
             )
             ON CONFLICT(external_id) DO UPDATE SET
@@ -203,6 +204,7 @@ def import_loads(path: Path | str, sheet_owner: str | None = None) -> int:
                 sheet_owner,
             ),
         )
+        ensure_dispatcher_fee_expense(row.get("load_id"), connection=connection)
     connection.commit()
     connection.close()
     return len(rows)
@@ -231,14 +233,14 @@ def import_car_loads(
                 updated_at
             )
             VALUES (
-                ?,
-                (SELECT id FROM trucks WHERE external_id = ?),
-                ?,
-                ?,
-                ?,
-                ?,
-                COALESCE(?, 'open'),
-                ?,
+                %s,
+                (SELECT id FROM trucks WHERE external_id = %s),
+                %s,
+                %s,
+                %s,
+                %s,
+                COALESCE(%s, 'open'),
+                %s,
                 CURRENT_TIMESTAMP
             )
             ON CONFLICT(external_id) DO UPDATE SET
@@ -262,6 +264,7 @@ def import_car_loads(
                 sheet_owner,
             ),
         )
+        ensure_dispatcher_fee_expense(row.get("Order ID"), connection=connection)
     connection.commit()
     connection.close()
     return len(rows)
@@ -285,15 +288,15 @@ def import_bank_transactions(path: Path | str, sheet_owner: str | None = None) -
                 sheet_owner
             )
             VALUES (
-                ?,
-                (SELECT id FROM bank_accounts WHERE external_id = ?),
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                (SELECT id FROM bank_accounts WHERE external_id = ?),
-                ?
+                %s,
+                (SELECT id FROM bank_accounts WHERE external_id = %s),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                (SELECT id FROM bank_accounts WHERE external_id = %s),
+                %s
             )
             ON CONFLICT(external_id) DO UPDATE SET
                 account_id=excluded.account_id,
@@ -340,14 +343,14 @@ def import_expenses(path: Path | str) -> int:
                 cost_center
             )
             VALUES (
-                (SELECT id FROM owners WHERE external_id = ?),
-                (SELECT id FROM trucks WHERE external_id = ?),
-                (SELECT id FROM bank_accounts WHERE external_id = ?),
-                ?,
-                ?,
-                ?,
-                ?,
-                ?
+                (SELECT id FROM owners WHERE external_id = %s),
+                (SELECT id FROM trucks WHERE external_id = %s),
+                (SELECT id FROM bank_accounts WHERE external_id = %s),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
             )
             """,
             (
