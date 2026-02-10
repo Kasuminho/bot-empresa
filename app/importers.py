@@ -35,6 +35,8 @@ def parse_amount(value: str | None) -> float:
             cleaned = cleaned.replace(".", "").replace(",", ".")
     elif "," in cleaned:
         cleaned = cleaned.replace(",", ".")
+    if cleaned == "":
+        return 0.0
     return float(cleaned)
 
 
@@ -147,6 +149,7 @@ def import_loads(path: Path | str, sheet_owner: str | None = None) -> int:
     connection = get_connection()
     cursor = connection.cursor()
     for row in rows:
+        amount_gross = parse_amount(row.get("amount_gross"))
         cursor.execute(
             """
             INSERT INTO loads (
@@ -196,9 +199,9 @@ def import_loads(path: Path | str, sheet_owner: str | None = None) -> int:
                 row.get("truck_id"),
                 parse_date(row.get("load_date")),
                 row.get("description"),
-                parse_amount(row.get("amount_gross")),
-                parse_amount(row.get("slv_fee_percent")) if row.get("slv_fee_percent") else 0.0,
-                parse_amount(row.get("recife_fee_percent")) if row.get("recife_fee_percent") else 10.0,
+                amount_gross,
+                11.0,
+                10.0,
                 row.get("status"),
                 row.get("week_reference"),
                 sheet_owner,
@@ -219,6 +222,7 @@ def import_car_loads(
     connection = get_connection()
     cursor = connection.cursor()
     for row in rows:
+        amount_gross = parse_amount(row.get("RATE"))
         cursor.execute(
             """
             INSERT INTO loads (
@@ -258,8 +262,8 @@ def import_car_loads(
                 truck_external_id,
                 parse_date(row.get("Delivery Date")) or parse_date(row.get("Pickup Date")),
                 row.get("EMPRESA"),
-                parse_amount(row.get("RATE")),
-                parse_amount(row.get("DISPATCHER FEE")) if row.get("DISPATCHER FEE") else 10.0,
+                amount_gross,
+                10.0,
                 "open",
                 sheet_owner,
             ),
