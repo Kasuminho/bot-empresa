@@ -35,6 +35,8 @@ def parse_amount(value: str | None) -> float:
             cleaned = cleaned.replace(".", "").replace(",", ".")
     elif "," in cleaned:
         cleaned = cleaned.replace(",", ".")
+    if cleaned == "":
+        return 0.0
     return float(cleaned)
 
 
