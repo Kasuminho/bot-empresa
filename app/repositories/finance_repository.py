@@ -201,7 +201,7 @@ class FinanceRepository:
                     l.load_date,
                     l.amount_gross,
                     ABS(l.amount_gross - %s) AS amount_gap,
-                    ABS(EXTRACT(EPOCH FROM (l.load_date - %s)) / 86400) AS day_gap
+                    ABS(l.load_date - %s) AS day_gap
                 FROM loads l
                 WHERE l.status != 'paid'
                 ORDER BY amount_gap ASC, day_gap ASC
