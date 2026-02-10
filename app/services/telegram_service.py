@@ -1,5 +1,6 @@
 import shlex
 import tempfile
+from uuid import uuid4
 from typing import Any
 
 import requests
@@ -98,13 +99,13 @@ class TelegramService:
     def help_message() -> str:
         return (
             "Comandos disponíveis:\n"
-            "/add_owner owner_id=... name=\"Nome\" telegram_chat_id=...\n"
-            "/add_driver driver_id=... name=\"Nome\" owner_id=... is_owner_driver=0|1\n"
-            "/add_truck truck_id=... owner_id=... plate=...\n"
-            "/add_account account_id=... label=\"Conta\" owner_id=... driver_id=...\n"
-            "/add_load load_id=... driver_id=... truck_id=... load_date=YYYY-MM-DD amount_gross=...\n"
+            "/add_owner name=\"Nome\" owner_id=opcional telegram_chat_id=...\n"
+            "/add_driver name=\"Nome\" driver_id=opcional owner_id=... is_owner_driver=0|1\n"
+            "/add_truck owner_id=... truck_id=opcional plate=...\n"
+            "/add_account label=\"Conta\" account_id=opcional owner_id=... driver_id=...\n"
+            "/add_load amount_gross=... load_id=opcional driver_id=... truck_id=... load_date=YYYY-MM-DD\n"
             "/add_expense owner_id=... truck_id=... account_id=... expense_date=YYYY-MM-DD amount=...\n"
-            "/add_bank_transaction transaction_id=... account_id=... txn_date=YYYY-MM-DD amount=...\n"
+            "/add_bank_transaction txn_date=YYYY-MM-DD amount=... transaction_id=opcional account_id=...\n"
             "/summary\n"
             "/close_week week_reference=2024-W27\n"
             "/ledger owner_id=OWNER_01 limit=10\n"
@@ -117,6 +118,15 @@ class TelegramService:
             "Confirmações: /confirm e /cancel\n"
             "Importação via CSV (envie o arquivo com a legenda): /import_*"
         )
+
+    @staticmethod
+    def _ensure_external_id(args: dict[str, str], key: str, prefix: str) -> str:
+        value = args.get(key)
+        if value:
+            return value
+        generated = f"{prefix}_{uuid4().hex[:8].upper()}"
+        args[key] = generated
+        return generated
 
     def _upsert_authorized_user(self, chat_id: str, username: str | None, role: str = "operator") -> None:
         self.repository.upsert_authorized_user(chat_id, username, role)
@@ -428,50 +438,55 @@ class TelegramService:
                 return
 
             if command == "/add_owner":
-                required = {"owner_id", "name"}
+                required = {"name"}
                 if not required.issubset(args):
-                    raise ValueError("Informe owner_id e name.")
+                    raise ValueError("Informe name.")
+                owner_id = self._ensure_external_id(args, "owner_id", "OWNER")
                 telegram_chat_id = args.get("telegram_chat_id") or chat_id
-                add_owner(args["owner_id"], args["name"], telegram_chat_id)
-                self.send_bot_message(chat_id, "Dono cadastrado com sucesso.")
+                add_owner(owner_id, args["name"], telegram_chat_id)
+                self.send_bot_message(chat_id, f"Dono cadastrado com sucesso. owner_id={owner_id}")
                 self._audit(chat_id, username, command, payload, "ok")
                 return
 
             if command == "/add_driver":
-                required = {"driver_id", "name"}
+                required = {"name"}
                 if not required.issubset(args):
-                    raise ValueError("Informe driver_id e name.")
-                add_driver(args["driver_id"], args["name"], args.get("owner_id"), args.get("is_owner_driver") == "1")
-                self.send_bot_message(chat_id, "Motorista cadastrado com sucesso.")
+                    raise ValueError("Informe name.")
+                driver_id = self._ensure_external_id(args, "driver_id", "DRIVER")
+                add_driver(driver_id, args["name"], args.get("owner_id"), args.get("is_owner_driver") == "1")
+                self.send_bot_message(chat_id, f"Motorista cadastrado com sucesso. driver_id={driver_id}")
                 self._audit(chat_id, username, command, payload, "ok")
                 return
 
             if command == "/add_truck":
-                required = {"truck_id", "owner_id"}
+                required = {"owner_id"}
                 if not required.issubset(args):
-                    raise ValueError("Informe truck_id e owner_id.")
-                add_truck(args["truck_id"], args["owner_id"], args.get("plate"))
-                self.send_bot_message(chat_id, "Truck cadastrado com sucesso.")
+                    raise ValueError("Informe owner_id.")
+                truck_id = self._ensure_external_id(args, "truck_id", "TRUCK")
+                add_truck(truck_id, args["owner_id"], args.get("plate"))
+                self.send_bot_message(chat_id, f"Truck cadastrado com sucesso. truck_id={truck_id}")
                 self._audit(chat_id, username, command, payload, "ok")
                 return
 
             if command == "/add_account":
-                required = {"account_id", "label"}
+                required = {"label"}
                 if not required.issubset(args):
-                    raise ValueError("Informe account_id e label.")
-                add_bank_account(args["account_id"], args["label"], args.get("owner_id"), args.get("driver_id"))
-                self.send_bot_message(chat_id, "Conta bancária cadastrada com sucesso.")
+                    raise ValueError("Informe label.")
+                account_id = self._ensure_external_id(args, "account_id", "ACC")
+                add_bank_account(account_id, args["label"], args.get("owner_id"), args.get("driver_id"))
+                self.send_bot_message(chat_id, f"Conta bancária cadastrada com sucesso. account_id={account_id}")
                 self._audit(chat_id, username, command, payload, "ok")
                 return
 
             if command == "/add_load":
-                required = {"load_id", "amount_gross"}
+                required = {"amount_gross"}
                 if not required.issubset(args):
-                    raise ValueError("Informe load_id e amount_gross.")
+                    raise ValueError("Informe amount_gross.")
+                load_id = self._ensure_external_id(args, "load_id", "LOAD")
                 self._queue_confirmation(chat_id, "add_load", args)
                 self.send_bot_message(
                     chat_id,
-                    f"Confirmar cadastro do load {args['load_id']}? Use /confirm ou /cancel.",
+                    f"Confirmar cadastro do load {load_id}? Use /confirm ou /cancel.",
                 )
                 self._audit(chat_id, username, command, payload, "pending")
                 return
@@ -495,11 +510,12 @@ class TelegramService:
                 return
 
             if command == "/add_bank_transaction":
-                required = {"transaction_id", "txn_date", "amount"}
+                required = {"txn_date", "amount"}
                 if not required.issubset(args):
-                    raise ValueError("Informe transaction_id, txn_date e amount.")
+                    raise ValueError("Informe txn_date e amount.")
+                transaction_id = self._ensure_external_id(args, "transaction_id", "TXN")
                 add_bank_transaction(
-                    args["transaction_id"],
+                    transaction_id,
                     args.get("account_id"),
                     args["txn_date"],
                     args.get("description"),
@@ -509,7 +525,7 @@ class TelegramService:
                     args.get("related_account_id"),
                     args.get("sheet_owner"),
                 )
-                self.send_bot_message(chat_id, "Transação bancária cadastrada com sucesso.")
+                self.send_bot_message(chat_id, f"Transação bancária cadastrada com sucesso. transaction_id={transaction_id}")
                 self._audit(chat_id, username, command, payload, "ok")
                 return
 

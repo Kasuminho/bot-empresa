@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from app.config import TELEGRAM_WEBHOOK_SECRET
 from app.services.telegram_service import TelegramService
@@ -12,7 +12,7 @@ async def telegram_webhook(request: Request) -> dict:
     if TELEGRAM_WEBHOOK_SECRET:
         secret_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
         if secret_header != TELEGRAM_WEBHOOK_SECRET:
-            return {"ok": False}
+            raise HTTPException(status_code=403, detail="Invalid webhook secret")
     update = await request.json()
     service.handle_update(update)
     return {"ok": True}
