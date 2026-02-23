@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.importers import import_loads
 from app.services.web_service import WebService
 
 router = APIRouter()
@@ -34,3 +38,27 @@ def reconcile(
 ):
     service.reconcile(bank_transaction_id, reconciliation_type, notes, load_ids)
     return RedirectResponse("/", status_code=303)
+
+
+@router.post("/api/loads/import-csv")
+async def import_loads_csv(
+    file: UploadFile = File(...),
+    sheet_owner: str | None = Form(None),
+) -> JSONResponse:
+    suffix = Path(file.filename or "loads.csv").suffix or ".csv"
+    with NamedTemporaryFile(mode="wb", suffix=suffix, delete=False) as temp_file:
+        temp_file.write(await file.read())
+        temp_path = Path(temp_file.name)
+
+    try:
+        imported_count = import_loads(temp_path, sheet_owner=sheet_owner)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "imported_count": imported_count,
+            "sheet_owner": sheet_owner,
+        }
+    )
